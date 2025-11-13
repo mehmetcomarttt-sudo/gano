@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İki Aşamalı Şans Kupası Oyunu</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Kumar masası temasına uygun font */
+        @import url('https://fonts.googleapis.com/css2?family=Chicle&family=Inter:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; /* Koyu tema */
+            color: #e5e7eb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        #gameContainer {
+            background-color: #0b5329; /* Koyu yeşil kumar masası */
+            background-image: radial-gradient(#22c55e 5%, transparent 5%), radial-gradient(#15803d 5%, transparent 5%);
+            background-size: 40px 40px;
+            border: 10px solid #a78bfa; /* Mor çerçeve */
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), inset 0 0 30px rgba(0, 0, 0, 0.5);
+            max-width: 900px;
+            width: 95%;
+            padding: 24px;
+        }
+
+        /* Zar Stili */
+        .dice {
+            width: 60px;
+            height: 60px;
+            background-color: #fff;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            font-weight: bold;
+            color: #ef4444;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.4), 0 5px 10px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s ease-out, background-color 0.3s, color 0.3s;
+        }
+        
+        /* Zar Dönme Animasyonu */
+        .rolling {
+            animation: diceRoll 0.5s infinite linear;
+            color: #4b5563 !important;
+        }
+
+        @keyframes diceRoll {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.1); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        /* Buton Stili */
+        .game-button {
+            font-family: 'Chicle', cursive;
+            transition: all 0.2s;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+            border-bottom: 4px solid rgba(0,0,0,0.4);
+        }
+        .game-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+        .game-button:active {
+            transform: translateY(2px);
+            border-bottom: 0px solid rgba(0,0,0,0.4);
+        }
+        .game-button:disabled {
+            background-color: #4b5563;
+            cursor: not-allowed;
+            transform: none;
+            border-bottom: 0px;
+        }
+        
+        /* Maymun Seçim Butonu */
+        .monkey-button {
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            border: 3px solid transparent;
+        }
+        .monkey-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 255, 0, 0.7);
+        }
+        .monkey-button.selected {
+            border-color: #facc15;
+            box-shadow: 0 0 30px rgba(255, 255, 0, 1);
+            transform: scale(1.1);
+        }
+
+
+        /* Confetti Efekti */
+        .confetti-container {
+            position: fixed; 
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 50;
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: transparent;
+            opacity: 0;
+            animation: fall 3s ease-in forwards;
+        }
+
+        @keyframes fall {
+            0% { transform: translate(var(--x, 0), var(--y, 0)) rotate(0deg); opacity: 1; }
+            100% { transform: translate(var(--endX, 0), 100vh) rotate(720deg); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        
+        <!-- Confetti Alanı -->
+        <div id="confettiContainer" class="confetti-container"></div>
+
+        <!-- Başlık -->
+        <h1 class="text-4xl font-extrabold text-yellow-300 text-center mb-6 border-b-2 border-yellow-500 pb-2" style="font-family: 'Chicle', cursive;">
+            ŞANS KUPASI OYUNU
+        </h1>
+
+        <!-- Ana Ekranlar için Alan -->
+        <div id="screenArea" class="min-h-[400px] flex justify-center items-center">
+            
+            <!-- 1. Karakter Seçim Ekranı -->
+            <div id="charSelectScreen" class="w-full">
+                <p class="text-center text-lg mb-6 text-gray-200">Kupa mücadelesi için karakterini seç:</p>
+                <div id="characterGrid" class="grid grid-cols-5 gap-4">
+                    <!-- Karakterler buraya JS ile eklenecek -->
+                </div>
+            </div>
+
+            <!-- 2. Zar Oyun Ekranı (1. Tur) -->
+            <div id="diceScreen" class="w-full flex-col items-center justify-center hidden">
+                
+                <h2 class="text-3xl font-extrabold text-white mb-6 text-center" style="font-family: 'Chicle', cursive;">1. TUR: ZAR DÜELLOSU (5 SKORA ULAŞ)</h2>
+
+                <!-- Skor Alanı -->
+                <div class="flex justify-between items-start w-full text-center mb-8">
+                    
+                    <!-- Oyuncu (Sol) -->
+                    <div class="flex flex-col items-center w-1/3">
+                        <span id="playerEmoji" class="text-5xl"></span>
+                        <span id="playerName" class="text-2xl font-bold text-yellow-300 mt-2"></span>
+                        
+                        <!-- Oyuncu Zarları -->
+                        <div class="flex space-x-3 mt-4 justify-center">
+                            <div id="playerDice1" class="dice">?</div>
+                            <div id="playerDice2" class="dice">?</div>
+                        </div>
+
+                        <div class="text-4xl font-extrabold mt-6 p-3 rounded-lg bg-gray-900 border-2 border-yellow-500">
+                            SKOR: <span id="playerScoreDisplay">0</span>
+                        </div>
+                    </div>
+
+                    <div class="text-6xl font-bold text-red-500 w-1/3 mt-16 self-center">VS</div>
+
+                    <!-- Rakip (Sağ) -->
+                    <div class="flex flex-col items-center w-1/3">
+                        <span id="opponentEmoji" class="text-5xl"></span>
+                        <span id="opponentName" class="text-2xl font-bold text-red-400 mt-2">RAKİP</span>
+                        
+                        <!-- Rakip Zarları -->
+                        <div class="flex space-x-3 mt-4 justify-center">
+                            <div id="opponentDice1" class="dice">?</div>
+                            <div id="opponentDice2" class="dice">?</div>
+                        </div>
+
+                        <div class="text-4xl font-extrabold mt-6 p-3 rounded-lg bg-gray-900 border-2 border-red-500">
+                            SKOR: <span id="opponentScoreDisplay">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kontrol Butonu ve Mesaj Alanı -->
+                <div class="text-center w-full mt-4 p-4 bg-gray-800 rounded-xl shadow-inner">
+                    <p id="turnMessage" class="text-xl font-bold mb-6 text-green-300">Sıra Sende! Zar At.</p>
+                    <button id="rollButton" class="game-button bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-extrabold py-3 px-10 rounded-full text-xl shadow-lg">
+                        Zar At!
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Maymun Oyunu Ekranı (2. Tur) -->
+            <div id="monkeyGameScreen" class="w-full flex-col items-center justify-center hidden p-8 bg-red-800/50 rounded-xl border-4 border-yellow-500">
+                <h2 class="text-3xl font-extrabold text-yellow-300 mb-4 text-center" style="font-family: 'Chicle', cursive;">🏆 İKİNCİ TUR: MAYMUN ŞANSI 🏆</h2>
+                <p class="text-xl mb-6 text-gray-100 text-center font-semibold" id="monkeyGameSubtitle">Kupayı almak için 3 Maymundan birini seç ve 3 Turda 2 Galibiyete ulaş!</p>
+                
+                <!-- Maymun Seçim Alanı -->
+                <div class="flex justify-center space-x-4 mb-8">
+                    <div class="monkey-button p-4 rounded-xl bg-gray-900/80 text-center" data-monkey="see" onclick="selectMonkey('see')">
+                        <span class="text-5xl">🙈</span>
+                        <p class="text-sm font-bold mt-1 text-gray-300">Görmedim</p>
+                    </div>
+                    <div class="monkey-button p-4 rounded-xl bg-gray-900/80 text-center" data-monkey="hear" onclick="selectMonkey('hear')">
+                        <span class="text-5xl">🙉</span>
+                        <p class="text-sm font-bold mt-1 text-gray-300">Duymadım</p>
+                    </div>
+                    <div class="monkey-button p-4 rounded-xl bg-gray-900/80 text-center" data-monkey="speak" onclick="selectMonkey('speak')">
+                        <span class="text-5xl">🙊</span>
+                        <p class="text-sm font-bold mt-1 text-gray-300">Bilmiyorum</p>
+                    </div>
+                </div>
+
+                <!-- Maymun Oyunu Zar Atışları ve Skor -->
+                <div class="flex flex-col items-center w-full">
+                    <!-- Skor -->
+                    <div class="text-4xl font-extrabold text-white mb-6">
+                        SKOR: <span id="monkeyPlayerWinsDisplay" class="text-green-400">0</span> - <span id="monkeyOpponentWinsDisplay" class="text-red-400">0</span>
+                    </div>
+
+                    <!-- Zar Görselleri -->
+                    <div class="flex space-x-12 items-center justify-center mb-6">
+                        <div class="flex flex-col items-center">
+                            <p class="text-xl font-bold text-yellow-300">SENİN ZARIN</p>
+                            <div id="monkeyPlayerDice" class="dice w-20 h-20 text-4xl mt-2 bg-yellow-100 text-gray-900">?</div>
+                        </div>
+                        
+                        <div class="text-4xl font-extrabold text-white pt-8">VS</div>
+                        
+                        <div class="flex flex-col items-center">
+                            <p class="text-xl font-bold text-red-300">MAYMUN ZARI</p>
+                            <div id="monkeyOpponentDice" class="dice w-20 h-20 text-4xl mt-2 bg-red-100 text-gray-900">?</div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <button id="monkeyRollButton" class="game-button bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 px-8 rounded-full text-xl shadow-lg" disabled>
+                    Zar At (1. Tur)
+                </button>
+                <p id="monkeyGameMessage" class="text-xl font-bold mt-4 text-yellow-300 text-center">Bir maymun seçimi yapın.</p>
+            </div>
+
+
+            <!-- 4. Sonuç Ekranı (Final) -->
+            <div id="resultScreen" class="w-full flex-col items-center justify-center hidden">
+                <h2 id="resultTitle" class="text-5xl font-extrabold text-white mb-6 text-center" style="font-family: 'Chicle', cursive;"></h2>
+                <p id="resultSubtitle" class="text-2xl font-semibold mb-8 text-gray-300 text-center"></p>
+                <button id="restartButton" class="game-button bg-blue-500 hover:bg-blue-600 text-white font-extrabold py-3 px-10 rounded-full text-xl shadow-lg">
+                    Yeniden Başla
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase global değişkenleri (Ortam gereksinimi için dahil edilmiştir)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+
+        // --- Oyun Verileri ve Durumu ---
+        const CHARACTERS = [
+            { name: "Seval", emoji: "⭐", color: "#facc15" },
+            { name: "Muhterem", emoji: "🎩", color: "#3b82f6" },
+            { name: "Nihan", emoji: "🧘", color: "#14b8a6" },
+            { name: "Duygu", emoji: "💃", color: "#a855f7" },
+            { name: "Nergiz", emoji: "🌺", color: "#f97316" },
+            { name: "Faika", emoji: "👵", color: "#f0abfc" },
+            { name: "Mehmet", emoji: "👔", color: "#ef4444" },
+            { name: "Emine", emoji: "👩‍🔬", color: "#22c55e" },
+            { name: "Zeynep", emoji: "🌟", color: "#60a5fa" },
+            { name: "Ms. Gracy", emoji: "👑", color: "#c084fc" }
+        ];
+
+        const TARGET_DICE_SCORE = 5; // Zar turu kazanma hedefi
+        const TARGET_MONKEY_WINS = 2; // Maymun turu kazanma hedefi (3'te 2)
+
+        let gameState = {
+            player: null,
+            opponent: null,
+            playerScore: 0, // Zar Turu Skoru
+            opponentScore: 0, // Zar Turu Skoru
+            monkeyPlayerWins: 0, // Maymun Turu Oyuncu Skoru
+            monkeyOpponentWins: 0, // Maymun Turu Rakip Skoru
+            currentMonkey: null, // Seçilen maymun
+            isRolling: false,
+            currentStage: 'dice'
+        };
+
+        // --- DOM Elementleri ---
+        const charSelectScreen = document.getElementById('charSelectScreen');
+        const diceScreen = document.getElementById('diceScreen');
+        const monkeyGameScreen = document.getElementById('monkeyGameScreen');
+        const resultScreen = document.getElementById('resultScreen');
+        const characterGrid = document.getElementById('characterGrid');
+        const rollButton = document.getElementById('rollButton');
+        const restartButton = document.getElementById('restartButton');
+        const turnMessage = document.getElementById('turnMessage');
+        const confettiContainer = document.getElementById('confettiContainer');
+
+        // Zar Turu Skor/İsim Elementleri
+        const playerNameEl = document.getElementById('playerName');
+        const playerEmojiEl = document.getElementById('playerEmoji');
+        const playerScoreDisplayEl = document.getElementById('playerScoreDisplay');
+        const opponentNameEl = document.getElementById('opponentName');
+        const opponentEmojiEl = document.getElementById('opponentEmoji');
+        const opponentScoreDisplayEl = document.getElementById('opponentScoreDisplay');
+        const resultSubtitleEl = document.getElementById('resultSubtitle');
+
+        // Zar Turu Zar Elementleri
+        const pDice1El = document.getElementById('playerDice1');
+        const pDice2El = document.getElementById('playerDice2');
+        const oDice1El = document.getElementById('opponentDice1');
+        const oDice2El = document.getElementById('opponentDice2');
+        const ALL_DICE = [pDice1El, pDice2El, oDice1El, oDice2El];
+        
+        // Maymun Turu Elementleri
+        const monkeyPlayerWinsDisplayEl = document.getElementById('monkeyPlayerWinsDisplay');
+        const monkeyOpponentWinsDisplayEl = document.getElementById('monkeyOpponentWinsDisplay');
+        const monkeyRollButtonEl = document.getElementById('monkeyRollButton');
+        const monkeyGameMessageEl = document.getElementById('monkeyGameMessage');
+        const monkeyPlayerDiceEl = document.getElementById('monkeyPlayerDice'); // Yeni Oyuncu Zarı
+        const monkeyOpponentDiceEl = document.getElementById('monkeyOpponentDice'); // Yeni Maymun Zarı
+        const MONKEY_DICE = [monkeyPlayerDiceEl, monkeyOpponentDiceEl];
+        const monkeyButtons = document.querySelectorAll('.monkey-button');
+
+
+        // --- GENEL FONKSİYONLAR ---
+
+        // Ekran Yöneticisi
+        function showScreen(screenId) {
+            charSelectScreen.classList.add('hidden');
+            diceScreen.classList.add('hidden');
+            monkeyGameScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+
+            const screen = document.getElementById(screenId);
+            if (screen) {
+                // Flex/Flex-col olarak ayarlanan ekranlar için
+                if (screenId === 'diceScreen' || screenId === 'monkeyGameScreen' || screenId === 'resultScreen') {
+                    screen.classList.remove('hidden');
+                    screen.classList.add('flex-col');
+                } else {
+                    screen.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Oyun Sıfırlama
+        function resetGame() {
+            gameState.playerScore = 0;
+            gameState.opponentScore = 0;
+            gameState.monkeyPlayerWins = 0;
+            gameState.monkeyOpponentWins = 0;
+            gameState.isRolling = false;
+            gameState.currentStage = 'dice';
+            gameState.currentMonkey = null;
+
+            playerScoreDisplayEl.textContent = '0';
+            opponentScoreDisplayEl.textContent = '0';
+            
+            handleNextTurnDice(); // Zar UI'ını başlangıç durumuna getir
+        }
+
+        // --- ZAR TURU (1. Aşama) ---
+
+        // Rastgele sayı (çift zar) atma
+        function rollDicePair() {
+            const dice1 = Math.floor(Math.random() * 6) + 1;
+            const dice2 = Math.floor(Math.random() * 6) + 1;
+            return { d1: dice1, d2: dice2, total: dice1 + dice2 };
+        }
+        
+        // Tek zar atma
+        function rollSingleDice() {
+            return Math.floor(Math.random() * 6) + 1;
+        }
+
+        // Karakter Seçimi ve Oyun Başlatma
+        function selectCharacter(selectedChar) {
+            gameState.player = selectedChar;
+            const availableOpponents = CHARACTERS.filter(c => c.name !== selectedChar.name);
+            gameState.opponent = availableOpponents[Math.floor(Math.random() * availableOpponents.length)];
+
+            resetGame();
+            
+            // UI Güncelleme
+            playerNameEl.textContent = gameState.player.name;
+            playerEmojiEl.textContent = gameState.player.emoji;
+            opponentNameEl.textContent = gameState.opponent.name;
+            opponentEmojiEl.textContent = gameState.opponent.emoji;
+            
+            showScreen('diceScreen');
+        }
+
+        // Zar Atma Eylemini Yönetme (1. Tur)
+        function handleRollDice() {
+            if (gameState.isRolling || gameState.playerScore === TARGET_DICE_SCORE || gameState.opponentScore === TARGET_DICE_SCORE) return;
+
+            gameState.isRolling = true;
+            rollButton.disabled = true;
+            rollButton.textContent = 'Atılıyor...';
+            
+            ALL_DICE.forEach(dice => {
+                dice.classList.add('rolling');
+                dice.textContent = '?';
+            });
+            
+            setTimeout(() => {
+                const playerRoll = rollDicePair();
+                const opponentRoll = rollDicePair();
+
+                ALL_DICE.forEach(dice => dice.classList.remove('rolling'));
+                updateDiceUI(playerRoll, opponentRoll);
+                
+                let message = '';
+                const roundWinner = determineDiceWinner(playerRoll.total, opponentRoll.total);
+                
+                if (roundWinner === 'player') {
+                    gameState.playerScore++;
+                    message = `${gameState.player.name} Kazandı! (${playerRoll.total} > ${opponentRoll.total})`;
+                    turnMessage.classList.remove('text-red-400', 'text-pink-400', 'text-gray-200');
+                    turnMessage.classList.add('text-green-300');
+                } else if (roundWinner === 'opponent') {
+                    gameState.opponentScore++;
+                    message = `${gameState.opponent.name} Kazandı! (${opponentRoll.total} > ${playerRoll.total})`;
+                    turnMessage.classList.remove('text-green-300', 'text-pink-400', 'text-gray-200');
+                    turnMessage.classList.add('text-red-400');
+                } else {
+                    message = `Berabere! (${playerRoll.total} = ${opponentRoll.total})`;
+                    turnMessage.classList.remove('text-green-300', 'text-red-400', 'text-pink-400');
+                    turnMessage.classList.add('text-gray-200');
+                }
+
+                if (playerRoll.d1 === 6 && playerRoll.d2 === 6) { 
+                    message += ' (ÇİFTE ALTI!)';
+                    triggerConfetti();
+                }
+                
+                playerScoreDisplayEl.textContent = gameState.playerScore;
+                opponentScoreDisplayEl.textContent = gameState.opponentScore;
+                turnMessage.textContent = message;
+
+                gameState.isRolling = false;
+
+                // Oyun bitiş kontrolü
+                if (gameState.playerScore === TARGET_DICE_SCORE || gameState.opponentScore === TARGET_DICE_SCORE) {
+                    endDiceGame();
+                } else {
+                    rollButton.textContent = 'Sıradaki Tur';
+                    rollButton.onclick = handleNextTurnDice;
+                    rollButton.disabled = false;
+                }
+                
+            }, 1000); 
+        }
+
+        // Kazananı Belirle (1. Tur)
+        function determineDiceWinner(pTotal, oTotal) {
+            if (pTotal > oTotal) return 'player';
+            if (oTotal > pTotal) return 'opponent';
+            return 'draw';
+        }
+
+        // Zar Görünümünü Güncelle (1. Tur)
+        function updateDiceUI(pRoll, oRoll) {
+            pDice1El.textContent = pRoll.d1;
+            pDice2El.textContent = pRoll.d2;
+            oDice1El.textContent = oRoll.d1;
+            oDice2El.textContent = oRoll.d2;
+            pDice1El.style.backgroundColor = pDice2El.style.backgroundColor = '#fef3c7';
+            pDice1El.style.color = pDice2El.style.color = '#ca8a04';
+            oDice1El.style.backgroundColor = oDice2El.style.backgroundColor = '#fee2e2';
+            oDice1El.style.color = oDice2El.style.color = '#dc2626';
+        }
+        
+        // Yeni Tura Geçme (1. Tur)
+        function handleNextTurnDice() {
+            ALL_DICE.forEach(dice => {
+                dice.textContent = '?';
+                dice.style.backgroundColor = '#fff';
+                dice.style.color = '#ef4444';
+            });
+            
+            turnMessage.textContent = 'Sıra Sende! Zar At.';
+            turnMessage.classList.remove('text-red-400', 'text-pink-400', 'text-gray-200');
+            turnMessage.classList.add('text-green-300');
+            
+            rollButton.textContent = 'Zar At!';
+            rollButton.onclick = handleRollDice;
+            rollButton.disabled = false;
+        }
+
+        // Zar Turu Bitişi (2. Aşamaya Geçiş veya Kayıp)
+        function endDiceGame() {
+            const titleEl = document.getElementById('resultTitle');
+            
+            if (gameState.playerScore === TARGET_DICE_SCORE) {
+                gameState.currentStage = 'monkey';
+                startMonkeyGame();
+                return; 
+            } else {
+                titleEl.textContent = `Maalesef, ${gameState.opponent.name} Zar Turunu Kazandı.`;
+                titleEl.classList.remove('text-yellow-300');
+                titleEl.classList.add('text-red-500');
+                resultSubtitleEl.textContent = `Kupa mücadelesi 1. turda elendi. Final skoru: ${gameState.playerScore}-${gameState.opponentScore}`;
+                showScreen('resultScreen');
+            }
+        }
+
+        // --- MAYMUN OYUNU (2. Aşama) ---
+
+        function startMonkeyGame() {
+            gameState.monkeyPlayerWins = 0;
+            gameState.monkeyOpponentWins = 0;
+            gameState.currentMonkey = null;
+            
+            monkeyPlayerWinsDisplayEl.textContent = '0';
+            monkeyOpponentWinsDisplayEl.textContent = '0';
+            
+            MONKEY_DICE.forEach(dice => {
+                dice.textContent = '?';
+                dice.style.backgroundColor = dice === monkeyPlayerDiceEl ? '#fef3c7' : '#fee2e2';
+                dice.style.color = '#1f2937';
+            });
+
+            monkeyRollButtonEl.textContent = 'Zar At (1. Tur)';
+            monkeyRollButtonEl.onclick = handleMonkeyRoll;
+            monkeyRollButtonEl.disabled = true; // Maymun seçilene kadar kapalı
+            
+            monkeyGameMessageEl.textContent = `Kupa için Maymun Şansına hoş geldin ${gameState.player.name}. Bir maymun seçimi yapın.`;
+            monkeyGameMessageEl.classList.remove('text-red-400', 'text-green-300');
+            monkeyGameMessageEl.classList.add('text-yellow-300');
+            
+            monkeyButtons.forEach(btn => {
+                btn.classList.remove('selected');
+                btn.onclick = () => selectMonkey(btn.dataset.monkey);
+                btn.disabled = false;
+            });
+            
+            showScreen('monkeyGameScreen');
+        }
+
+        window.selectMonkey = (selection) => {
+            if (gameState.isRolling) return;
+            
+            gameState.currentMonkey = selection;
+            
+            monkeyButtons.forEach(btn => {
+                btn.classList.remove('selected');
+                btn.disabled = true; // Seçildikten sonra değiştirilmesin
+            });
+            
+            const selectedBtn = document.querySelector(`.monkey-button[data-monkey="${selection}"]`);
+            if (selectedBtn) {
+                selectedBtn.classList.add('selected');
+            }
+
+            monkeyRollButtonEl.disabled = false;
+            monkeyGameMessageEl.textContent = `Maymun ${selection} seçildi. Kupayı almak için Zarı At!`;
+        }
+
+        function handleMonkeyRoll() {
+            if (gameState.isRolling || gameState.monkeyPlayerWins === TARGET_MONKEY_WINS || gameState.monkeyOpponentWins === TARGET_MONKEY_WINS) return;
+
+            gameState.isRolling = true;
+            monkeyRollButtonEl.disabled = true;
+            monkeyRollButtonEl.textContent = 'Atılıyor...';
+            
+            MONKEY_DICE.forEach(dice => dice.classList.add('rolling'));
+            
+            setTimeout(() => {
+                const playerRoll = rollSingleDice();
+                const monkeyRoll = rollSingleDice();
+                
+                MONKEY_DICE.forEach(dice => dice.classList.remove('rolling'));
+                monkeyPlayerDiceEl.textContent = playerRoll;
+                monkeyOpponentDiceEl.textContent = monkeyRoll;
+                
+                let roundMessage = '';
+                
+                if (playerRoll > monkeyRoll) {
+                    // Oyuncu kazanır
+                    gameState.monkeyPlayerWins++;
+                    roundMessage = `🎉 ZAR: ${playerRoll} > ${monkeyRoll} - Sen kazandın! Bir puan hanene yazıldı.`;
+                    monkeyGameMessageEl.classList.remove('text-red-400', 'text-yellow-300');
+                    monkeyGameMessageEl.classList.add('text-green-300');
+                } else if (monkeyRoll > playerRoll) {
+                    // Maymun kazanır
+                    gameState.monkeyOpponentWins++;
+                    roundMessage = `😞 ZAR: ${playerRoll} < ${monkeyRoll} - Maymun kazandı. Bir puan ona yazıldı.`;
+                    monkeyGameMessageEl.classList.remove('text-green-300', 'text-yellow-300');
+                    monkeyGameMessageEl.classList.add('text-red-400');
+                } else {
+                    // Berabere
+                    roundMessage = `🤝 ZAR: ${playerRoll} = ${monkeyRoll} - Berabere! Tekrar atış yapmalısın.`;
+                    monkeyGameMessageEl.classList.remove('text-red-400', 'text-green-300');
+                    monkeyGameMessageEl.classList.add('text-yellow-300');
+                }
+                
+                // Zar renklerini kazananın rengine göre ayarla
+                if (playerRoll > monkeyRoll) {
+                    monkeyPlayerDiceEl.style.backgroundColor = '#34d399'; // Yeşil
+                    monkeyOpponentDiceEl.style.backgroundColor = '#ef4444'; // Kırmızı
+                } else if (monkeyRoll > playerRoll) {
+                    monkeyPlayerDiceEl.style.backgroundColor = '#ef4444'; // Kırmızı
+                    monkeyOpponentDiceEl.style.backgroundColor = '#34d399'; // Yeşil
+                } else {
+                    monkeyPlayerDiceEl.style.backgroundColor = '#fef3c7'; // Berabere
+                    monkeyOpponentDiceEl.style.backgroundColor = '#fef3c7'; // Berabere
+                }
+
+                monkeyPlayerWinsDisplayEl.textContent = gameState.monkeyPlayerWins;
+                monkeyOpponentWinsDisplayEl.textContent = gameState.monkeyOpponentWins;
+                monkeyGameMessageEl.textContent = roundMessage;
+
+                gameState.isRolling = false;
+                
+                checkMonkeyGameEnd();
+
+            }, 1000); 
+        }
+
+        function checkMonkeyGameEnd() {
+            if (gameState.monkeyPlayerWins === TARGET_MONKEY_WINS) {
+                endFinalGame(true);
+            } else if (gameState.monkeyOpponentWins === TARGET_MONKEY_WINS) {
+                endFinalGame(false);
+            } else {
+                // Tur devam ediyor
+                const currentRound = gameState.monkeyPlayerWins + gameState.monkeyOpponentWins + 1;
+                
+                // Beraberlik varsa tur sayısı artmaz, sadece buton metni değişir.
+                if (currentRound > 3) {
+                    // Bu noktaya gelmemeli, ama Beraberlik durumunda 3 atıştan sonra da devam etmeli.
+                    monkeyRollButtonEl.textContent = `Zar At (${currentRound}. Tur)`;
+                } else {
+                    monkeyRollButtonEl.textContent = `Zar At (${currentRound}. Tur)`;
+                }
+
+                monkeyRollButtonEl.disabled = false;
+                
+                // Zar görünümünü sıfırla (görsel olarak yeni tura hazırla)
+                if (gameState.monkeyPlayerWins !== TARGET_MONKEY_WINS && gameState.monkeyOpponentWins !== TARGET_MONKEY_WINS) {
+                    setTimeout(() => {
+                        MONKEY_DICE.forEach(dice => {
+                            dice.textContent = '?';
+                            dice.style.backgroundColor = dice === monkeyPlayerDiceEl ? '#fef3c7' : '#fee2e2';
+                            dice.style.color = '#1f2937';
+                        });
+                        monkeyGameMessageEl.textContent = `Sıradaki tur için hazırsın! Zarı At!`;
+                    }, 1500);
+                }
+            }
+        }
+
+        function endFinalGame(playerWonCup) {
+            
+            monkeyButtons.forEach(btn => btn.disabled = true);
+            monkeyRollButtonEl.disabled = true;
+
+            const titleEl = document.getElementById('resultTitle');
+            
+            if (playerWonCup) {
+                titleEl.textContent = `🏆 ${gameState.player.name} Şampiyon! 🏆`;
+                titleEl.classList.add('text-yellow-300');
+                titleEl.classList.remove('text-red-500');
+                resultSubtitleEl.textContent = `TEBRİKLER! İki aşamayı da tamamlayarak BÜYÜK KUPAYI aldın! Final Skoru: ${gameState.monkeyPlayerWins}-${gameState.monkeyOpponentWins}`;
+                triggerConfetti(300);
+            } else {
+                titleEl.textContent = `Kupa Kaybedildi.`;
+                titleEl.classList.add('text-red-500');
+                titleEl.classList.remove('text-yellow-300');
+                resultSubtitleEl.textContent = `Maymun Şansı Turunda kaybettin. Final Skoru: ${gameState.monkeyPlayerWins}-${gameState.monkeyOpponentWins}. Bir sonraki sefere daha çok şans dileriz.`;
+            }
+            
+            // Final ekranına geçiş
+            setTimeout(() => {
+                showScreen('resultScreen');
+            }, 3000); 
+        }
+
+
+        // --- YARDIMCI FONKSİYONLAR ---
+
+        // Konfeti Efekti
+        function triggerConfetti(count = 100) {
+            const colors = ['#facc15', '#ef4444', '#3b82f6', '#10b981', '#a78bfa', '#f0abfc'];
+            for (let i = 0; i < count; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                confetti.style.setProperty('--x', `${Math.random() * 100}vw`);
+                confetti.style.setProperty('--y', `${-10 - Math.random() * 100}px`);
+                confetti.style.setProperty('--endX', `${Math.random() * 200 - 50}px`);
+                
+                const size = `${Math.random() * 10 + 5}px`;
+                confetti.style.width = size;
+                confetti.style.height = size;
+                confetti.style.animationDelay = `${Math.random() * 0.5}s`;
+                
+                confettiContainer.appendChild(confetti);
+                confetti.onanimationend = () => confetti.remove();
+            }
+        }
+        
+        // --- BAŞLATMA ---
+
+        function startGame() { 
+            // Olay dinleyicileri
+            rollButton.onclick = handleRollDice;
+            restartButton.onclick = createCharacterSelection;
+
+            // Karakter seçimi ile başla
+            createCharacterSelection();
+        }
+
+        // Karakter Seçim Butonlarını Oluşturma (Tekrar Tanımlandı)
+        function createCharacterSelection() {
+            characterGrid.innerHTML = '';
+            CHARACTERS.forEach(char => {
+                const button = document.createElement('button');
+                button.className = 'game-button p-4 rounded-xl flex flex-col items-center bg-gray-800 hover:bg-gray-700 text-white shadow-lg border-2 border-transparent hover:border-yellow-500';
+                button.innerHTML = `<span class="text-4xl">${char.emoji}</span><span class="mt-1 text-sm font-semibold">${char.name}</span>`;
+                button.onclick = () => selectCharacter(char);
+                characterGrid.appendChild(button);
+            });
+            showScreen('charSelectScreen');
+        }
+
+        // Firebase (Ortam Gereksinimi - Kullanılmasa Bile Dahil Edilmeli)
+        let app;
+        if (firebaseConfig) {
+            try {
+                app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                if (initialAuthToken) {
+                    signInWithCustomToken(auth, initialAuthToken)
+                        .then(() => startGame()) 
+                        .catch(error => {
+                            console.error("Firebase Custom Token ile oturum açma hatası:", error);
+                            signInAnonymously(auth).then(() => startGame()); 
+                        });
+                } else {
+                    signInAnonymously(auth).then(() => startGame()); 
+                }
+            } catch (error) {
+                console.error("Firebase başlatma hatası:", error);
+                startGame(); 
+            }
+        } else {
+            startGame(); 
+        }
+
+    </script>
+</body>
+</html>
